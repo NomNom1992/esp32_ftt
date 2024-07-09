@@ -1,9 +1,22 @@
 #include "mqttService.h"
 
-void initMQTTClient(PubSubClient* mqttClient) {
+void initMQTTClient_andSubTopic(PubSubClient* mqttClient) {
+
   mqttClient->setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient->setCallback(mqttCallback);
+
+  while (!mqttConnect(mqttClient)) {
+      Serial.println("Attempting to connect to MQTT...");
+      reconnectMQTT(mqttClient);
+      delay(1000);  // Wait for 1 second before trying again
+    }
+    
+    // Tạo tin nhắn và xuất bản lên MQTT
+    String message = String(MQTT_CLIENT_ID) + " online";
+    publishData(mqttClient, "espLTN/onoff", message);
+    Serial.println(message);
 }
+
 int mqttConnect(PubSubClient* mqttClient)
 {
   if(mqttClient->connected())
@@ -14,10 +27,11 @@ int mqttConnect(PubSubClient* mqttClient)
 
 void reconnectMQTT(PubSubClient* mqttClient) {
   while (!mqttClient->connected()) {
-    if (mqttClient->connect(MQTT_CLIENT_ID , MQTT_USERNAME, MQTT_PASSWORD)) {
+    if (mqttClient->connect(MQTT_CLIENT_ID.c_str() , MQTT_USERNAME, MQTT_PASSWORD)) {
       Serial.println("Connected to MQTT Broker");
       // SerialPort.println("Connected to MQTT Broker");
       mqttClient->subscribe("espLTN/onoff");
+      mqttClient->subscribe("espLTN/qr");
     } else {
       Serial.print("Failed to connect to MQTT Broker, rc=");
       Serial.println(mqttClient->state());
@@ -47,48 +61,39 @@ void mqttLoop(PubSubClient* mqttClient)
 // }
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // Xử lý dữ liệu nhận được từ MQTT
-  String receivedData;
-  for (unsigned int i = 0; i < length; i++) {
-    receivedData += (char)payload[i];
-  }
-  if(receivedData.startsWith("on")){
-    lcdPort.write(data_on, 8);
-    Serial.println("led on");
+  String receivedData = String((char*)payload, length);
 
-  } else if(receivedData.startsWith("off")){
-    lcdPort.write(data_off, 8);
-    Serial.println("led off");
-  } else {
-
-    const int MAX_MESSAGE_LENGTH = 200; // Adjust this based on your maximum expected message length
+  if (strcmp(topic, "espLTN/onoff") == 0) {
+    if (receivedData.startsWith("on")) {
+      lcdPort.write(data_on, sizeof(data_on));
+      Serial.println("LED on");
+    } else if (receivedData.startsWith("off")) {
+      lcdPort.write(data_off, sizeof(data_off));
+      Serial.println("LED off");
+    }
+  } else if (strcmp(topic, "espLTN/qr") == 0) {
+    const int MAX_MESSAGE_LENGTH = 200; // Điều chỉnh dựa trên độ dài tối đa dự kiến của tin nhắn
     byte messageArray[MAX_MESSAGE_LENGTH + 8];
 
+    // Xây dựng mảng tin nhắn
     messageArray[0] = 0x5A;
     messageArray[1] = 0xA5;
-    messageArray[2] = 0xA9;
+    messageArray[2] = length + 5;
     messageArray[3] = 0x82;
     messageArray[4] = 0x52;
     messageArray[5] = 0x40;
-    
-    // Copy payload to array
-    int arrayIndex = 6;
-    for (size_t i = 0; i < length && arrayIndex < MAX_MESSAGE_LENGTH + 6; i++) {
-      messageArray[arrayIndex++] = payload[i];
-    }
-    
-    // Add footer bytes
+
+    // Sao chép payload vào mảng
+    memcpy(&messageArray[6], payload, min(length, (unsigned int)(MAX_MESSAGE_LENGTH - 2)));
+
+    // Thêm byte kết thúc
+    int arrayIndex = min(length + 6, (unsigned int)(MAX_MESSAGE_LENGTH + 6));
     messageArray[arrayIndex++] = 0xFF;
     messageArray[arrayIndex++] = 0xFF;
-    
-    // Print the entire array in hex
-    // Serial.print("Message array in HEX: ");
-    for (int i = 0; i < 3; i++) {
-      // char hex[3];
-      // sprintf(hex, "%02X", messageArray[i]);
-      lcdPort.write(messageArray, arrayIndex);
-      Serial.write(messageArray, arrayIndex);
-    }
-  // Serial.println();
+
+    lcdPort.write(clear_qr, sizeof(clear_qr));
+    lcdPort.write(messageArray, arrayIndex);
+    Serial.write(messageArray, arrayIndex);
   }
 
   // const byte prefix[] = {0x5A, 0xA5, 0xA9, 0x82, 0x52, 0x40};

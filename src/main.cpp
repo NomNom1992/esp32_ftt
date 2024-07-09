@@ -1,15 +1,13 @@
 #include <WiFi.h>
-#include <PubSubClient.h>
+// #include <PubSubClient.h>
 #include "updateFirmware.h"
 #include "mqttService.h"
 #include "epromService.h"
-#include <HardwareSerial.h>
+#include "ntp.h"
+// #include <HardwareSerial.h>
 #include "global.h"
 
 const char* TOPIC_TEMP = "espLTN/temperature";
-
-
-
 
 
 String currentVersion = "1";
@@ -20,6 +18,8 @@ PubSubClient mqttClient(wifiClient);
 String ssid, password;
 
 HardwareSerial lcdPort(1);
+
+String message; 
 
 void connectWiFi(const String& ssid, const String& password);
 void processCommand(String command);
@@ -41,7 +41,14 @@ void setup() {
   } else {
     connectWiFi(ssid, password);
     isWiFiConfigured = true;
-    initMQTTClient(&mqttClient);
+
+    // Lấy địa chỉ MAC và gán cho MQTT_CLIENT_ID
+    MQTT_CLIENT_ID = WiFi.macAddress();
+    // MQTT_CLIENT_ID = strdup(macAddress.c_str());
+
+    initMQTTClient_andSubTopic(&mqttClient);
+
+    setup_NTP();
   }
 }
 
@@ -61,12 +68,14 @@ void loop() {
     }
     mqttLoop(&mqttClient);
 
+    timeClient.update();
+
     if (Serial.available()) {
       String command = Serial.readStringUntil('\n');
       processCommand(command);
     }
 
-    if (lcdPort.available() >= 8) {
+    if (lcdPort.available()) {
     byte data[9];
     lcdPort.readBytes(data, 9);
 
@@ -75,14 +84,14 @@ void loop() {
         uint16_t value = (data[7] << 8) | data[8];
 
         // Xử lý địa chỉ và giá trị
-        Serial.print("Address: ");
-        Serial.println(address, HEX);
         Serial.print("Value: ");
         Serial.println(value, HEX);
         if(value == 0){
-        publishData(&mqttClient, "espLTN/onoff", "led off");
+          message = getTime() + "led off";
+          publishData(&mqttClient, "espLTN/onoff", message );
         } else if(value == 1){
-        publishData(&mqttClient, "espLTN/onoff", "led on");
+          message = getTime() + "led on";
+          publishData(&mqttClient, "espLTN/onoff", message);
         }
       }
   }

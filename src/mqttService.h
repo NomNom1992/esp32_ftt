@@ -6,17 +6,14 @@
 
 #define MQTT_BROKER "broker.hivemq.com"
 #define MQTT_PORT 1883
-#define MQTT_CLIENT_ID "clientId-zRgpGTt97l"
+// #define MQTT_CLIENT_ID "clientId-zRgpGTt97l"
 #define MQTT_USERNAME ""
 #define MQTT_PASSWORD ""
-#define TOPIC_ONOFF = "espLTN/onoff";
+#define TOPIC_ONOFF = "espLTN/onoff"
+String static MQTT_CLIENT_ID = "";
 
 
-const uint8_t data_on[8] = {0x5A, 0xA5, 0x05, 0x82, 0x51, 0x00, 0x00, 0x01};
-const uint8_t data_off[8] = {0x5A, 0xA5, 0x05, 0x82, 0x51, 0x00, 0x00, 0x00};
-
-
-void initMQTTClient(PubSubClient* mqttClient);
+void initMQTTClient_andSubTopic(PubSubClient* mqttClient);
 int mqttConnect(PubSubClient* mqttClient);
 void reconnectMQTT(PubSubClient* mqttClient);
 void mqttLoop(PubSubClient* mqttClient);
