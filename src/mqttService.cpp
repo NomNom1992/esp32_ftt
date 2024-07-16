@@ -1,20 +1,49 @@
 #include "mqttService.h"
 
+char topic_sub[TOTAL_ID_SUB][LENGHT_TOPIC_SUB];
+char topic_pub[TOTAL_ID_PUB][LENGHT_TOPIC_PUB];
+String client_id = "";
+
+void mqtt_init_topic_pub() {
+    sprintf(topic_pub[TOPIC_PING_ID], "payment/device/%s/ping", client_id);
+    sprintf(topic_pub[TOPIC_CASH_ID], "payment/device/%s/cash", client_id);
+    sprintf(topic_pub[TOPIC_RESPONSE_ID], "payment/device/%s/response", client_id);
+    sprintf(topic_pub[TOPIC_QR_ID], "payment/device/%s/qr", client_id);
+    sprintf(topic_pub[TOPIC_CONFIG_ID], "payment/device/%s/config", client_id);
+    sprintf(topic_pub[TOPIC_DEBUG_ID], "payment/device/%s/debug", client_id);
+}
+
+void mqtt_init_topic_sub() {
+    sprintf(topic_sub[TOPIC_SUB_PING], "payment/server/%s/ping", client_id);
+    sprintf(topic_sub[TOPIC_SUB_QR], "payment/server/%s/qr", client_id);
+    sprintf(topic_sub[TOPIC_SUB_CONTROL], "payment/server/%s/control", client_id);
+    sprintf(topic_sub[TOPIC_SUB_UPDATE], "payment/server/%s/update", client_id);
+    sprintf(topic_sub[TOPIC_SUB_CONFIG], "payment/server/%s/config", client_id);
+    sprintf(topic_sub[TOPIC_SUB_DEBUG], "payment/server/%s/debug", client_id);
+}
+
+
+
+
 void initMQTTClient_andSubTopic(PubSubClient* mqttClient) {
 
   mqttClient->setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient->setCallback(mqttCallback);
+  mqtt_init_topic_sub();
+  mqtt_init_topic_pub();
 
   while (!mqttConnect(mqttClient)) {
       Serial.println("Attempting to connect to MQTT...");
+      Serial.println(client_id);
+
       reconnectMQTT(mqttClient);
       delay(1000);  // Wait for 1 second before trying again
     }
     
-    // Tạo tin nhắn và xuất bản lên MQTT
-    String message = String(MQTT_CLIENT_ID) + " online";
-    publishData(mqttClient, "espLTN/onoff", message);
-    Serial.println(message);
+    // Tạo tin nhắn login
+    // String message = getTime() + String(client_id) + " online";
+    // publishData(mqttClient, "espLTN/onoff", message);
+    // Serial.println(message);
 }
 
 int mqttConnect(PubSubClient* mqttClient)
@@ -27,15 +56,20 @@ int mqttConnect(PubSubClient* mqttClient)
 
 void reconnectMQTT(PubSubClient* mqttClient) {
   while (!mqttClient->connected()) {
-    if (mqttClient->connect(MQTT_CLIENT_ID.c_str() , MQTT_USERNAME, MQTT_PASSWORD)) {
+    if (mqttClient->connect(client_id.c_str())) {
       Serial.println("Connected to MQTT Broker");
-      // SerialPort.println("Connected to MQTT Broker");
-      mqttClient->subscribe("espLTN/onoff");
-      mqttClient->subscribe("espLTN/qr");
+
+      //vòng lặp sub vào các topic
+      for(size_t i = 0; i < TOTAL_ID_SUB; i++){
+        Serial.println(topic_sub[i]);
+        mqttClient -> subscribe(topic_sub[i]);
+      }
+
+      mqttClient -> subscribe("espLTN/onoff");
     } else {
       Serial.print("Failed to connect to MQTT Broker, rc=");
       Serial.println(mqttClient->state());
-      delay(2000);
+      delay(1000);
     }
   }
 }
@@ -95,33 +129,5 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     lcdPort.write(messageArray, arrayIndex);
     Serial.write(messageArray, arrayIndex);
   }
-
-  // const byte prefix[] = {0x5A, 0xA5, 0xA9, 0x82, 0x52, 0x40};
-  // const byte suffix[] = {0xFF, 0xFF};
-  // unsigned int hexLength = sizeof(prefix) + receivedData.length() + sizeof(suffix);
-  // byte* hexArray = new byte[hexLength];
-  
-  // // Sao chép các byte mở đầu vào mảng hex
-  // memcpy(hexArray, prefix, sizeof(prefix));
-  
-  // // Chuyển từng byte của message thành mã hex và lưu vào mảng
-  // for (unsigned int i = 0; i < receivedData.length(); i++) {
-  //   hexArray[sizeof(prefix) + i] = receivedData[i];
-  // }
-  
-  // // Sao chép các byte kết thúc vào mảng hex
-  // memcpy(hexArray + sizeof(prefix) + receivedData.length(), suffix, sizeof(suffix));
-
-  // lcdPort.write(hexArray, hexLength);
-  // Serial.write(hexArray, hexLength);
-  
-  // // Giải phóng bộ nhớ của mảng hex
-  // delete[] hexArray;
-  
-  
-
-
-  // Xử lý dữ liệu tại đây
-  // ...  
 }
 

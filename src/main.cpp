@@ -4,11 +4,7 @@
 #include "mqttService.h"
 #include "epromService.h"
 #include "ntp.h"
-// #include <HardwareSerial.h>
 #include "global.h"
-
-const char* TOPIC_TEMP = "espLTN/temperature";
-
 
 String currentVersion = "1";
 bool isWiFiConfigured = false;
@@ -21,6 +17,14 @@ HardwareSerial lcdPort(1);
 
 String message; 
 
+unsigned long time_now;
+int interval_30 = 30;
+int interval_10 = 10;
+unsigned long last_pub_login = 0;
+String time_cur;
+String date_cur;
+
+
 void connectWiFi(const String& ssid, const String& password);
 void processCommand(String command);
 void processConfigCommand(String command);
@@ -31,7 +35,6 @@ void setup() {
   Serial.begin(115200);
   EEPROM.begin(512);
   lcdPort.begin(115200, SERIAL_8N1, 18, 17);
-  // lcdPort.println("Hello");
 
   // Đọc thông tin WiFi từ EEPROM
   readWiFiCredentials(&ssid, &password);
@@ -42,10 +45,9 @@ void setup() {
     connectWiFi(ssid, password);
     isWiFiConfigured = true;
 
-    // Lấy địa chỉ MAC và gán cho MQTT_CLIENT_ID
-    MQTT_CLIENT_ID = WiFi.macAddress();
-    // MQTT_CLIENT_ID = strdup(macAddress.c_str());
-
+    // Lấy địa chỉ MAC và gán cho client_id
+    client_id = WiFi.macAddress();
+    client_id.replace(":", ""); // Loại bỏ dấu ':'
     initMQTTClient_andSubTopic(&mqttClient);
 
     setup_NTP();
@@ -62,13 +64,23 @@ void loop() {
     }
   } else {
     if (!mqttConnect(&mqttClient)) {
-      Serial.println("mqtt...");
-      // lcdPort.println("mqtt...");
+      Serial.println("mqtt connecting...");
       reconnectMQTT(&mqttClient);
     }
     mqttLoop(&mqttClient);
 
     timeClient.update();
+
+    time_now = timeClient.getEpochTime();
+
+    if (time_now - last_pub_login >= interval_30) {
+      last_pub_login = time_now;
+      time_cur = getTime();
+      date_cur = getDate();
+      char jsonBuffer[100];
+      sprintf(jsonBuffer, "{\"date\":\"%s\",\"time\":\"%s\",\"value\":\"%s\"}", date_cur, time_cur, client_id);
+      publishData(&mqttClient, topic_pub[TOPIC_PING_ID], jsonBuffer);
+  }
 
     if (Serial.available()) {
       String command = Serial.readStringUntil('\n');
@@ -84,7 +96,6 @@ void loop() {
         uint16_t value = (data[7] << 8) | data[8];
 
         // Xử lý địa chỉ và giá trị
-        Serial.print("Value: ");
         Serial.println(value, HEX);
         if(value == 0){
           message = getTime() + "led off";
@@ -94,12 +105,7 @@ void loop() {
           publishData(&mqttClient, "espLTN/onoff", message);
         }
       }
-  }
-
-    float temperature = random(20, 30);
-    publishData(&mqttClient, TOPIC_TEMP, String(temperature));
-    // Serial.println("publish OK...");
-    delay(1000);
+    }
   }
 }
 
