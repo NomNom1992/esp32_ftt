@@ -1,8 +1,12 @@
 #include "mqttService.h"
+#include <EEPROM.h>
 
 char topic_sub[TOTAL_ID_SUB][LENGHT_TOPIC_SUB];
 char topic_pub[TOTAL_ID_PUB][LENGHT_TOPIC_PUB];
 String client_id = "";
+int interval_30 = 30;
+unsigned long last_pub_login = 0;
+
 
 void mqtt_init_topic_pub() {
     sprintf(topic_pub[TOPIC_PING_ID], "payment/device/%s/ping", client_id);
@@ -39,11 +43,6 @@ void initMQTTClient_andSubTopic(PubSubClient* mqttClient) {
       reconnectMQTT(mqttClient);
       delay(1000);  // Wait for 1 second before trying again
     }
-    
-    // Tạo tin nhắn login
-    // String message = getTime() + String(client_id) + " online";
-    // publishData(mqttClient, "espLTN/onoff", message);
-    // Serial.println(message);
 }
 
 int mqttConnect(PubSubClient* mqttClient)
@@ -84,15 +83,6 @@ void mqttLoop(PubSubClient* mqttClient)
   mqttClient->loop();
 }
 
-// String toHexString(String data, size_t length) {
-//   String hexString = "";
-//   for (size_t i = 0; i < length; i++) {
-//     char hexChar[3];
-//     sprintf(hexChar, "%02X", data[i]);
-//     hexString += hexChar;
-//   }
-//   return hexString;
-// }
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // Xử lý dữ liệu nhận được từ MQTT
   String receivedData = String((char*)payload, length);
@@ -105,29 +95,89 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       lcdPort.write(data_off, sizeof(data_off));
       Serial.println("LED off");
     }
-  } else if (strcmp(topic, "espLTN/qr") == 0) {
+  } else if (strcmp(topic, topic_sub[TOPIC_SUB_QR]) == 0) {
+    //xóa qr cũ trên lcd
+    lcdPort.write(clear_qr, sizeof(clear_qr));
+    // Tạo buffer để lưu chuỗi JSON
+    char json[length + 1];
+    memcpy(json, payload, length);
+    json[length] = '\0';
+
+    JsonDocument doc; // Kích thước có thể điều chỉnh tùy theo độ lớn của JSON
+    DeserializationError error = deserializeJson(doc, json);
+
+    if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+    }    
+    // Lấy giá trị "value" từ JSON
+    const char* qrValue = doc["value"];
+    Serial.println(qrValue);
+
+    if (!qrValue) {
+        Serial.println("lỗi khi get qr");
+        return;
+    }
+    size_t qrLength = strlen(qrValue);
     const int MAX_MESSAGE_LENGTH = 200; // Điều chỉnh dựa trên độ dài tối đa dự kiến của tin nhắn
     byte messageArray[MAX_MESSAGE_LENGTH + 8];
 
     // Xây dựng mảng tin nhắn
     messageArray[0] = 0x5A;
     messageArray[1] = 0xA5;
-    messageArray[2] = length + 5;
+    messageArray[2] = qrLength + 5;
     messageArray[3] = 0x82;
     messageArray[4] = 0x52;
     messageArray[5] = 0x40;
 
-    // Sao chép payload vào mảng
-    memcpy(&messageArray[6], payload, min(length, (unsigned int)(MAX_MESSAGE_LENGTH - 2)));
+    // Sao chép giá trị QR vào mảng
+    memcpy(&messageArray[6], qrValue, min(qrLength, (size_t)(MAX_MESSAGE_LENGTH - 2)));
 
     // Thêm byte kết thúc
-    int arrayIndex = min(length + 6, (unsigned int)(MAX_MESSAGE_LENGTH + 6));
+    int arrayIndex = min(qrLength + 6, (size_t)(MAX_MESSAGE_LENGTH + 6));
     messageArray[arrayIndex++] = 0xFF;
     messageArray[arrayIndex++] = 0xFF;
 
-    lcdPort.write(clear_qr, sizeof(clear_qr));
     lcdPort.write(messageArray, arrayIndex);
     Serial.write(messageArray, arrayIndex);
   }
 }
 
+void mqtt_ping_each_30s(PubSubClient* mqttClient){
+    timeClient.update();
+    time_now = timeClient.getEpochTime();
+
+    if (time_now - last_pub_login >= interval_30){
+      last_pub_login = time_now;
+      time_cur = getTime();
+      date_cur = getDate();
+      char json_buffer_ping[100];
+      sprintf(json_buffer_ping, "{\"date\":\"%s\",\"time\":\"%s\",\"value\":\"%s\"}", date_cur, time_cur, client_id);
+      publishData(mqttClient, topic_pub[TOPIC_PING_ID], json_buffer_ping);
+    }
+}
+
+
+void mqtt_pub_order(PubSubClient* mqttClient){
+  byte data[12];
+  int length = lcdPort.readBytes(data, 12);
+
+  if (data[4] == 0x55 && data[5] == 0x00 && data[3] == 0x83) {
+    uint16_t value = (data[length - 2] << 8) | data[length - 1];
+    if (value >= 1 && value < 5) {
+
+
+        int cashValue;
+        EEPROM.get(100 + (value-1) * sizeof(int), cashValue);
+
+        time_cur = getTime();
+        date_cur = getDate();
+
+        char json_buffer_qr[100];
+        sprintf(json_buffer_qr, "{\"date\":\"%s\",\"time\":\"%s\",\"value\":\"%d\"}", date_cur, time_cur, cashValue);
+        publishData(mqttClient, topic_pub[TOPIC_QR_ID], json_buffer_qr);
+
+    }
+  }
+}

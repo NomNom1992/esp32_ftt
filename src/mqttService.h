@@ -4,6 +4,7 @@
 #include <PubSubClient.h>
 #include "global.h"
 #include "ntp.h"
+#include <ArduinoJson.h>
 /***********************************************/
 // #define MQTT_BROKER "mqtt.thanhtoanqrcode.vn"
 // #define MQTT_PORT 1883
@@ -56,6 +57,6 @@ void reconnectMQTT(PubSubClient* mqttClient);
 void mqttLoop(PubSubClient* mqttClient);
 void publishData(PubSubClient* mqttClient, const char* topic, String data);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
-
-
+void mqtt_ping_each_30s(PubSubClient* mqttClient);
+void mqtt_pub_order(PubSubClient* mqttClient);
 #endif

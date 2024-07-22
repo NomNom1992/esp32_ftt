@@ -4,6 +4,9 @@
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "0.asia.pool.ntp.org", 25200, 60000);  // NTP server, offset in seconds, update interval
 
+String time_cur = "";
+String date_cur = "";
+unsigned long time_now = 0;
 
 void setup_NTP() {
     timeClient.begin();

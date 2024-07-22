@@ -7,7 +7,9 @@
 // Khai báo biến toàn cục
 extern WiFiUDP ntpUDP;
 extern NTPClient timeClient;
-
+extern String time_cur;
+extern String date_cur;
+extern unsigned long time_now;
 
 // extern unsigned long time_now;
 // extern int interval_30;
