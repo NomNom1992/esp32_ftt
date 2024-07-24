@@ -1,5 +1,6 @@
 #include "mqttService.h"
 #include <EEPROM.h>
+#include "gpio.h"
 
 char topic_sub[TOTAL_ID_SUB][LENGHT_TOPIC_SUB];
 char topic_pub[TOTAL_ID_PUB][LENGHT_TOPIC_PUB];
@@ -95,7 +96,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       lcdPort.write(data_off, sizeof(data_off));
       Serial.println("LED off");
     }
-  } else if (strcmp(topic, topic_sub[TOPIC_SUB_QR]) == 0) {
+  } 
+  // SẼ TÁCH THÀNH HÀM QR RIÊNG
+  else if (strcmp(topic, topic_sub[TOPIC_SUB_QR]) == 0) {
     //xóa qr cũ trên lcd
     lcdPort.write(clear_qr, sizeof(clear_qr));
     // Tạo buffer để lưu chuỗi JSON
@@ -142,6 +145,33 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     lcdPort.write(messageArray, arrayIndex);
     Serial.write(messageArray, arrayIndex);
   }
+  // thực hiện sau khi thanh toán thành công
+  else if(strcmp(topic, topic_sub[TOPIC_SUB_CONTROL]) == 0){
+
+    char json[length + 1];
+    memcpy(json, payload, length);
+    json[length] = '\0';
+
+    JsonDocument doc; // Kích thước có thể điều chỉnh tùy theo độ lớn của JSON
+    DeserializationError error = deserializeJson(doc, json);
+
+    if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+    }    
+    // Lấy giá trị "value" từ JSON
+    const char* strvalue = doc["value"];
+    uint8_t intvalue = (uint8_t)atoi(strvalue);
+    Serial.println(intvalue);
+
+    if (!intvalue) {
+        Serial.println("lỗi khi nhận phản hồi thanh toán");
+        return;
+    }
+    generatePulses_2(intvalue);
+
+  }
 }
 
 void mqtt_ping_each_30s(PubSubClient* mqttClient){
@@ -177,7 +207,6 @@ void mqtt_pub_order(PubSubClient* mqttClient){
         char json_buffer_qr[100];
         sprintf(json_buffer_qr, "{\"date\":\"%s\",\"time\":\"%s\",\"value\":\"%d\"}", date_cur, time_cur, cashValue);
         publishData(mqttClient, topic_pub[TOPIC_QR_ID], json_buffer_qr);
-
     }
   }
 }

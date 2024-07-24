@@ -10,6 +10,7 @@
 // #define MQTT_PORT 1883
 
 #define MQTT_BROKER "mqtt.thanhtoanqrcode.vn"
+// #define MQTT_BROKER systemManager.server
 #define MQTT_PORT 1883
 
 
@@ -59,4 +60,6 @@ void publishData(PubSubClient* mqttClient, const char* topic, String data);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqtt_ping_each_30s(PubSubClient* mqttClient);
 void mqtt_pub_order(PubSubClient* mqttClient);
+void get_value_and_gen_pulse();
+
 #endif

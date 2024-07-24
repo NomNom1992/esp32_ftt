@@ -1,0 +1,6 @@
+json trả về khi thanh toán thành công
+topic  payment/server/ECDA3B519EBC/control
+{"date":"220724","time":"150522","value":"001","id":"111"}
+
+value -> int
+
