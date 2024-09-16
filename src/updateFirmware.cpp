@@ -16,6 +16,10 @@ void checkFirmwareUpdate(String *host,String *path, String *currentVersion) {
       Serial.println("SPIFFS Mount Failed");
       return;
     }
+    Serial.println("**************************");
+    Serial.println(hostCStr);
+    Serial.println(pathCStr);
+
     getFileFromServer(hostCStr, pathCStr);
     performOTAUpdateFromSPIFFS();
   } else {
@@ -34,6 +38,7 @@ String getLatestVersion(String *firmwareURL) {
     if (dotIndex != -1 && dotIndex > versionIndex) {
       // Trích xuất chuỗi phiên bản từ URL
       String version = firmwareURL->substring(versionIndex + 8, dotIndex);
+      Serial.println(version);
       return version;
     }
   }
@@ -61,7 +66,7 @@ void getFileFromServer(const char* host, const char* path) {
     bool endOfHeaders = false;
     String headers = "";
     String http_response_code = "error";
-    const size_t bufferSize = 1024;
+    const size_t bufferSize = 4096;
     uint8_t buffer[bufferSize];
 
     while (client.connected() && !endOfHeaders) {

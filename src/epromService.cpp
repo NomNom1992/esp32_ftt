@@ -9,12 +9,11 @@ union FloatToBytes {
 };
 
 void saveWiFiCredentials(String* ssid, String* password) {
-  EEPROM.writeString(450, *ssid);
+
   strcpy(systemManager.ssid, ssid->c_str());
-  EEPROM.writeString(482, *password);
-  strcpy(systemManager.password, password->c_str());
   
-  EEPROM.commit();
+  strcpy(systemManager.password, password->c_str());
+
 }
 
 void readWiFiCredentials(String* ssid, String* password) {
@@ -92,7 +91,6 @@ void send_cash_and_time_data(HardwareSerial &lcdPort, SystemConfig& config) {
 }
 
 void time_setup_command(String cashString) {
-  // if (cashString.startsWith("cash:")) {
     int time[4];
     for (int i = 0; i < 4; i++) {
       time[i] = cashString.substring(5 + i * 3, 8 + i * 3).toInt();

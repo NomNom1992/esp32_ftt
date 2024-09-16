@@ -26,7 +26,6 @@ String message;
 void connectWiFi(const String& ssid, const String& password);
 void processCommand(String command);
 void processConfigCommand(String command);
-// void cash_setup_command(String command);
 
 
 void setup() {
@@ -36,14 +35,37 @@ void setup() {
   
   pinMode(PULSE_PIN, OUTPUT);
   digitalWrite(PULSE_PIN, HIGH);
+
   //đọc struct từ eprom
-
   read_config_from_EEPROM(systemManager);
+  if(strlen(systemManager.server) == 0){
+    
+  //khởi tạo các giá trị mặc định cho struct
+    systemManager.reinitialize();
+
+  }
+
   // Đọc thông tin WiFi từ EEPROM
-  readWiFiCredentials(&ssid, &password);
+  // readWiFiCredentials(&ssid, &password);
+    Serial.println("*****************");
+    Serial.println(systemManager.ssid);
+    Serial.println("*****************");
+    Serial.println(systemManager.password);
+    Serial.println("*****************");
+    Serial.println(systemManager.server);
+    Serial.println("*****************");
 
+    Serial.println(systemManager.cash[0]);
+    Serial.println(systemManager.cash[1]);
+    Serial.println(systemManager.cash[2]);
+    Serial.println(systemManager.cash[3]);
+    Serial.println("*****************");
+    Serial.println(systemManager.time[0]);
+    Serial.println(systemManager.time[1]);
+    Serial.println(systemManager.time[2]);
+    Serial.println(systemManager.time[3]);
 
-  if (ssid.isEmpty() || password.isEmpty()) {
+  if (systemManager.ssid == 0 || systemManager.password == 0) {
     Serial.println("No WiFi credentials found. Waiting for WiFi configuration...");
   } else {
     connectWiFi(systemManager.ssid, systemManager.password);
@@ -58,21 +80,7 @@ void setup() {
 
     send_cash_and_time_data(lcdPort, systemManager);
 
-    // SystemGetValue();
-    Serial.println("*****************");
-    Serial.println(systemManager.ssid);
-    Serial.println("*****************");
-    Serial.println(systemManager.password);
-    Serial.println("*****************");
-    Serial.println(systemManager.cash[0]);
-    Serial.println(systemManager.cash[1]);
-    Serial.println(systemManager.cash[2]);
-    Serial.println(systemManager.cash[3]);
-    Serial.println("*****************");
-    Serial.println(systemManager.time[0]);
-    Serial.println(systemManager.time[1]);
-    Serial.println(systemManager.time[2]);
-    Serial.println(systemManager.time[3]);
+   
   }
 }
 
@@ -104,6 +112,9 @@ void loop() {
       
     }
   }
+  if(WiFi.status() != WL_CONNECTED){
+    connectWiFi(systemManager.ssid, systemManager.password);
+  }
 }
 
 void processCommand(String command) {
@@ -115,6 +126,11 @@ void processCommand(String command) {
     if (separatorIndex != -1) {
       String host = link.substring(0, separatorIndex + 4);
       String path = link.substring(separatorIndex + 4);
+
+      Serial.println("*****************");
+      Serial.println(host);
+      Serial.println(path);
+
       checkFirmwareUpdate(&host, &path, &currentVersion);
     }
   } else if (command.startsWith("cash:")){
@@ -123,6 +139,8 @@ void processCommand(String command) {
     time_setup_command(command);
   } else if (command.startsWith("restartnow")){
     save_config_to_EEPROM_and_restart(systemManager);
+  } else if (command.startsWith("server:")){
+    system_config_server(command);
   }
 }
 
@@ -137,8 +155,16 @@ void processConfigCommand(String command) {
 void connectWiFi(const String& ssid, const String& password) {
   WiFi.begin(ssid.c_str(), password.c_str());
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.println("Connecting to WiFi...");
+
+    //chờ nhận lệnh config wifi mới
+    if (Serial.available()) {
+      String command = Serial.readStringUntil('\n');
+      if (command.startsWith("CONFIG_WIFI:")) {
+        processConfigCommand(command);
+      }
+    }
   }
   Serial.println("Connected to WiFi");
 }

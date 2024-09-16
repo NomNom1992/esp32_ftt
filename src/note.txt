@@ -4,3 +4,5 @@ topic  payment/server/ECDA3B519EBC/control
 
 value -> int
 
+link raw github: https://raw.githubusercontent.com/NomNom1992/esp32_ftt/main/version_2.bin
+

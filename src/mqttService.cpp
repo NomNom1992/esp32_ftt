@@ -32,7 +32,7 @@ void mqtt_init_topic_sub() {
 
 void initMQTTClient_andSubTopic(PubSubClient* mqttClient) {
 
-  mqttClient->setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient->setServer(systemManager.server, MQTT_PORT);
   mqttClient->setCallback(mqttCallback);
   mqtt_init_topic_sub();
   mqtt_init_topic_pub();
